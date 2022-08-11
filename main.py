@@ -94,9 +94,9 @@ class Main:
             time.sleep(0.5)
             passed_secs += 0.5
             
-            # Update humidty every 10 seconds
+            # Update humidity every 10 seconds
             if passed_secs % 10 == 0:
-                self.air_quality.set_humidty(self.temperature_sensor.humidity)
+                self.air_quality.set_humidity(self.temperature_sensor.humidity)
 
             # Every hour save and reload baseline
             if self.finished_calibration and passed_secs >= 60*60:

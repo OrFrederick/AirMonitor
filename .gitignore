@@ -1,3 +1,5 @@
+# SGP30 Baseline file
+sgp30_baseline
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]

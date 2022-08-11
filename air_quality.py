@@ -3,6 +3,7 @@ from sgp30 import SGP30
 import logging
 import time
 import sys
+import config as cfg
 
 class AirQuality:
     def __init__(self):
@@ -19,19 +20,20 @@ class AirQuality:
         
     def save_baseline(self):
         eco2, tvoc = self.sensor.command('get_baseline')
-        with open("sgp30_baseline", "w") as f:
+        with open(cfg.BASELINE, "w") as f:
             f.write(f"{eco2};{tvoc}")
             self.co2_baseline = eco2
             self.voc_baseline = tvo
-            print("Loaded baseline")
+            print("Saved baseline")
 
     def set_humidity(self, humidity):
-        self.sensor.command("set_humidty", humidity)
-        print("Set new humidity", humidity)
+        self.sensor.command("set_humidity", [round(humidity)])
+        print("Set new humidity", humidity, round(humidity))
 
     def load_baseline(self):
-        if not exists("sgp30_baseline"): return False
-        with open("sgp30_baseline", "r") as f:
+        print(cfg.BASELINE)
+        if not exists(cfg.BASELINE): return False
+        with open(cfg.BASELINE, "r") as f:
             l = f.readline().strip()
             if len(l) == 0: return
             t = [int(i) for i in l.split(";")]

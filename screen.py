@@ -7,7 +7,6 @@ import config as cfg
 
 class Screen:
     def __init__(self):
-        print("starting screen")
         self.disp = OLED_1in3.OLED_1in3()
         self.disp.Init()
         self.disp.clear()

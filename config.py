@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 dotenv_path = join(dirname(__file__), '.env')
 load_dotenv(dotenv_path)
 FONTS = os.path.dirname(os.path.abspath(__file__)) + '/fonts'
+BASELINE = os.path.dirname(os.path.abspath(__file__)) + '/sgp30_baseline'
 # sw clk dt
 ROTARY_ENCODER = (17, 23, 22)
 SHUTDOWN_BTN = 24
