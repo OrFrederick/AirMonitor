@@ -21,7 +21,6 @@ class AirQuality:
             f.write(f"{eco2};{tvoc}")
          
     def load_baseline(self):
-        return
         if not exists("sgp30_baseline"): return
         with open("sgp30_baseline", "r") as f:
             l = f.readline().strip()
