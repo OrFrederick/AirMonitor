@@ -10,6 +10,7 @@ from datetime import datetime
 from PIL import ImageFont
 import threading
 import psutil
+from atmos import calculate
 
 import influxdb_client, os, time
 from influxdb_client import InfluxDBClient, Point, WritePrecision
@@ -93,6 +94,10 @@ class Main:
         while True:
             time.sleep(0.5)
             passed_secs += 0.5
+
+            if passed_secs%120 == 0:
+                ah = calculate('AH', RH=self.temperature_sensor.humidity, p=1e5, T=round(273.15 + self.temperature_sensor.temperature), debug=True)[0]
+                self.air_quality.set_humidity(ah*1000) 
 
             # Every hour save and reload baseline
             if self.finished_calibration and passed_secs >= 60*60:

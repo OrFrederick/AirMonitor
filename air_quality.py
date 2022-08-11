@@ -38,9 +38,11 @@ class AirQuality:
             self.voc_baseline = int(t[1])
             print("Loaded baseline")
         return True
-    
+
     def update(self):
         result = self.sensor.get_air_quality()
         self.co2 = result.equivalent_co2
         self.voc = result.total_voc
     
+    def set_humidity(self, humidity):        
+        self.sensor.command('set_humidity', [round(humidity)])
