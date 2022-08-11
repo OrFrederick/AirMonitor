@@ -26,10 +26,6 @@ class AirQuality:
             self.voc_baseline = tvo
             print("Saved baseline")
 
-    def set_humidity(self, humidity):
-        self.sensor.command("set_humidity", [round(humidity)])
-        print("Set new humidity", humidity, round(humidity))
-
     def load_baseline(self):
         print(cfg.BASELINE)
         if not exists(cfg.BASELINE): return False
