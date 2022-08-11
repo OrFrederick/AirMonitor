@@ -10,6 +10,7 @@ from datetime import datetime
 from PIL import ImageFont
 import threading
 import psutil
+from atmos import calculate
 
 import influxdb_client, os, time
 from influxdb_client import InfluxDBClient, Point, WritePrecision
@@ -19,18 +20,22 @@ import config as cfg
 
 class Main:
     def __init__(self):
+        print(datetime.utcnow())
         self.renc = RotaryEncoder(*cfg.ROTARY_ENCODER)
         self.temperature_sensor = DHT11()
         self.screen = Screen()
         self.air_quality = AirQuality()
+        
         self.cur_page = 0
+        self.finished_calibration = self.air_quality.found_baseline
+
         t = threading.Thread(target=self.update_measurings, args=(), daemon = True)
         t.start()
  
         # InfluxDB
-        token = cfg.INFLUX_DB_TOKEN  #  "c9Z6r5hiJ9HyKTTQViYVu0G6DQP2OgUsC6KBMxDfswCr-RJgEQNOqDFgo-EY3k5AgTMeHQvu198Bhn13UWauSQ=="
-        org = cfg.INFLUX_DB_ORG #  "frederick.ortmanns@gmail.com"
-        url = cfg.INFLUX_DB_URL # "https://europe-west1-1.gcp.cloud2.influxdata.com"
+        token = cfg.INFLUX_DB_TOKEN
+        org = cfg.INFLUX_DB_ORG
+        url = cfg.INFLUX_DB_URL
 
         self.client = influxdb_client.InfluxDBClient(url=url, token=token, org=org)
         
@@ -45,8 +50,6 @@ class Main:
             
         while True:
             dtime = datetime.utcnow()
-            disk = psutil.disk_usage('/')
-            mem = psutil.virtual_memory()
             load = psutil.getloadavg()
             
             body = [
@@ -55,15 +58,8 @@ class Main:
                         "time": dtime,
                         
                         "fields": {
-                            "load_1": load[0],
-                            "load_5": load[1],
-                            "load_15": load[2],
-                            "disk_percent": disk.percent,
-                            "disk_free": disk.free,
-                            "disk_used": disk.used,
-                            "mem_percent": mem.percent,
-                            "mem_free": mem.free,
-                            "mem_used": mem.used
+                            "load_1": load[0],                         
+                            "cpu_temp": psutil.sensors_temperatures()['cpu_thermal'][0].current,
                         }
                     }
                 ]
@@ -77,6 +73,8 @@ class Main:
                         "humidity": self.temperature_sensor.humidity,
                         "CO2": self.air_quality.co2,
                         "VOC": self.air_quality.voc,
+                        "co2_baseline": self.air_quality.co2_baseline,
+                        "voc_baseline": self.air_quality.voc_baseline
                         }
                     })
                 try:
@@ -92,15 +90,27 @@ class Main:
     
     def main(self):
         passed_secs = 0
-        last_change = 0
-        last_value = -1
+
         while True:
             time.sleep(0.5)
             passed_secs += 0.5
-            if passed_secs >= 3600:
-                print("SAVED NEW BASELINE")
+
+            if passed_secs%120 == 0:
+                ah = calculate('AH', RH=self.temperature_sensor.humidity, p=1e5, T=round(273.15 + self.temperature_sensor.temperature), debug=True)[0]
+                self.air_quality.set_humidity(ah*1000) 
+
+            # Every hour save and reload baseline
+            if self.finished_calibration and passed_secs >= 60*60:
                 self.air_quality.save_baseline()
+                self.air_quality.load_baseline()
                 passed_secs = 0
+
+            # Finish calibration after 12 hours
+            if not self.finished_calibration and  passed_secs >= 60*60*12:
+                self.air_quality.save_baseline()
+                self.air_quality.load_baseline()
+                passed_secs = 0
+                self.finished_calibration = True
 
             if self.renc.btnToggled:
                 time.sleep(2)
@@ -108,6 +118,7 @@ class Main:
                 if self.screen.on:
                     self.screen.disp.command(0xAE)
                     self.screen.on = False
+                # Skip drawing the screen
                 continue
             elif not self.screen.on:
                 self.screen.disp.command(0xAF)
@@ -118,25 +129,13 @@ class Main:
             dtime = datetime.now().strftime("%H:%M:%S")
             date = datetime.now().strftime("%d.%m.%Y")
             pages = [
-                Page([[(0,0),(sw-1,0)], [(0,0),(0,sh-1)], [(0,sh-1),(sw-1,sh-1)], [(sw-1,0),(sw-1, sh-1)]], [[(5, sh-18), "Temperature", 2], [(sw-25, sh-18), "1/4", 2], [(5, 3), dtime, 0], [(sw-75, 3), date,0], [self.screen.get_center_coords(f"{self.temperature_sensor.temperature}°C", 1), f"{self.temperature_sensor.temperature}°C", 1]]),
-                Page([[(0,0),(sw-1,0)], [(0,0),(0,sh-1)], [(0,sh-1),(sw-1,sh-1)], [(sw-1,0),(sw-1, sh-1)]], [[(5, sh-18), "Humidity", 2], [(sw-25, sh-18), "2/4", 2], [(5, 3), dtime, 0], [(sw-75, 3), date, 0], [self.screen.get_center_coords(f"{self.temperature_sensor.humidity}%", 1), f"{self.temperature_sensor.humidity}%", 1]]),           
-                Page([[(0,0),(sw-1,0)], [(0,0),(0,sh-1)], [(0,sh-1),(sw-1,sh-1)], [(sw-1,0),(sw-1, sh-1)]], [[(5, sh-18), "CO2", 2], [(sw-25, sh-18), "3/4", 2], [(5, 3), dtime, 0], [(sw-75, 3), date, 0], [self.screen.get_center_coords(f"{self.air_quality.co2}ppm", 1), f"{self.air_quality.co2}ppm", 1]]),
-                Page([[(0,0),(sw-1,0)], [(0,0),(0,sh-1)], [(0,sh-1),(sw-1,sh-1)], [(sw-1,0),(sw-1, sh-1)]], [[(5, sh-18), "VOC", 2], [(sw-25, sh-18), "4/4", 2], [(5, 3), dtime, 0], [(sw-75, 3), date, 0], [self.screen.get_center_coords(f"{self.air_quality.voc}ppb", 1), f"{self.air_quality.voc}ppb", 1]]),
+                Page([[(0,0),(sw-1,0)], [(0,0),(0,sh-1)], [(0,sh-1),(sw-1,sh-1)], [(sw-1,0),(sw-1, sh-1)]], [[(5, sh-18), "Temperature", 2], [(sw-25, sh-18), "1/4", 2], [(5, 3), dtime, 0], [(sw-65, 3), date,0], [self.screen.get_center_coords(f"{self.temperature_sensor.temperature}°C", 1), f"{self.temperature_sensor.temperature}°C", 1]]),
+                Page([[(0,0),(sw-1,0)], [(0,0),(0,sh-1)], [(0,sh-1),(sw-1,sh-1)], [(sw-1,0),(sw-1, sh-1)]], [[(5, sh-18), "Humidity", 2], [(sw-25, sh-18), "2/4", 2], [(5, 3), dtime, 0], [(sw-65, 3), date, 0], [self.screen.get_center_coords(f"{self.temperature_sensor.humidity}%", 1), f"{self.temperature_sensor.humidity}%", 1]]),           
+                Page([[(0,0),(sw-1,0)], [(0,0),(0,sh-1)], [(0,sh-1),(sw-1,sh-1)], [(sw-1,0),(sw-1, sh-1)]], [[(5, sh-18), "CO2", 2], [(sw-25, sh-18), "3/4", 2], [(5, 3), dtime, 0], [(sw-65, 3), date, 0], [self.screen.get_center_coords(f"{self.air_quality.co2}ppm", 1), f"{self.air_quality.co2}ppm", 1]]),
+                Page([[(0,0),(sw-1,0)], [(0,0),(0,sh-1)], [(0,sh-1),(sw-1,sh-1)], [(sw-1,0),(sw-1, sh-1)]], [[(5, sh-18), "VOC", 2], [(sw-25, sh-18), "4/4", 2], [(5, 3), dtime, 0], [(sw-65, 3), date, 0], [self.screen.get_center_coords(f"{self.air_quality.voc}ppb", 1), f"{self.air_quality.voc}ppb", 1]]),
             ]          
             
-            
             self.cur_page = abs(self.renc.value) % len(pages)
-            
-            # Every 10 Seconds: Go to next page
-            if self.renc.value != last_value:
-                last_change = 0
-                last_value = self.renc.value
-            else:
-                last_change += 0.5
-            
-                if last_change % 10 == 0:
-                    self.renc.value += 1                 
-                    self.renc.value %= len(pages)
             self.screen.draw_page(pages[self.cur_page])
 if __name__ == '__main__':
     m = Main()
