@@ -9,6 +9,8 @@ FONTS = '/home/frederick/AirMonitor/fonts'
 ROTARY_ENCODER = (17, 23, 22)
 SHUTDOWN_BTN = 24
 DHT11 = 4
-INFLUX_DB_TOKEN  = os.environ.get("INFLUX_DB_TOKEN")
-INFLUX_DB_ORG = os.environ.get("INFLUX_DB_ORG")
-INFLUX_DB_URL = os.environ.get("INFLUX_DB_URL") 
+
+if os.path.exists(dirname(__file__), '.env'):
+    INFLUX_DB_TOKEN  = os.environ.get("INFLUX_DB_TOKEN")
+    INFLUX_DB_ORG = os.environ.get("INFLUX_DB_ORG")
+    INFLUX_DB_URL = os.environ.get("INFLUX_DB_URL") 

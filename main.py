@@ -33,10 +33,10 @@ class Main:
         url = cfg.INFLUX_DB_URL # "https://europe-west1-1.gcp.cloud2.influxdata.com"
 
         self.client = influxdb_client.InfluxDBClient(url=url, token=token, org=org)
-        
-        t2 = threading.Thread(target=self.send_to_influxdb, args=(), daemon = True)
-        t2.deamon = True
-        t2.start()
+        if cfg.USE_INFLUX_DB:
+            t2 = threading.Thread(target=self.send_to_influxdb, args=(), daemon = True)
+            t2.deamon = True
+            t2.start()
 
     # Logs the data to your InfluxDB
     def send_to_influxdb(self):
